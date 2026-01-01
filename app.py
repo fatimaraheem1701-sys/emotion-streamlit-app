@@ -1,70 +1,27 @@
-# Emotion_Detection_Recommendation.ipynb
-!pip install deepface opencv-python-headless textblob pandas
+import streamlit as st
 import pandas as pd
+from textblob import TextBlob
+from deepface import DeepFace
+import tempfile
 
-data = {
-    "Emotion": [
-        "Happy","Sad","Angry","Fear","Surprise",
-        "Disgust","Neutral","Love","Lonely","Relaxed",
-        "Motivated","Depressed","Excited","Calm",
-        "Confident","Bored","Hopeful","Grateful",
-        "Anxious","Proud"
-    ],
-    "Song": [
-        "Happy – Pharrell Williams",
-        "Someone Like You – Adele",
-        "Believer – Imagine Dragons",
-        "Demons – Imagine Dragons",
-        "Uptown Funk – Bruno Mars",
-        "Bad Guy – Billie Eilish",
-        "Let It Be – Beatles",
-        "Perfect – Ed Sheeran",
-        "Fix You – Coldplay",
-        "Weightless – Marconi Union",
-        "Eye of the Tiger – Survivor",
-        "1-800-273-8255 – Logic",
-        "Can't Stop the Feeling – JT",
-        "River – Leon Bridges",
-        "Stronger – Kanye West",
-        "Stressed Out – Twenty One Pilots",
-        "Hall of Fame – The Script",
-        "Thank You – Dido",
-        "Breathin – Ariana Grande",
-        "We Are The Champions – Queen"
-    ],
-    "Quote": [
-        "Happiness is a choice.",
-        "Every storm runs out of rain.",
-        "Control your anger before it controls you.",
-        "Fear is temporary, regret is forever.",
-        "Life is full of surprises.",
-        "Negativity harms the soul.",
-        "Peace begins with acceptance.",
-        "Love is the strongest emotion.",
-        "You are never truly alone.",
-        "Calm mind brings inner strength.",
-        "Push yourself, no one else will.",
-        "This feeling will pass.",
-        "Energy flows where attention goes.",
-        "Silence heals the soul.",
-        "Believe in your abilities.",
-        "Boredom is unused creativity.",
-        "Hope is stronger than fear.",
-        "Gratitude turns what we have into enough.",
-        "Anxiety does not define you.",
-        "Be proud of how far you’ve come."
-    ]
-}
+# ----------------------
+# Page config
+# ----------------------
+st.set_page_config(
+    page_title="Emotion Detection & Recommendation",
+    page_icon="😊"
+)
 
-df = pd.DataFrame(data)
-df.to_csv("emotions_data.csv", index=False)
+st.title("🎭 Emotion Detection & Recommendation System")
 
-# The previous command was incomplete, so let's complete it and remove the duplicate import
-
+# ----------------------
+# Load dataset
+# ----------------------
 emotion_df = pd.read_csv("emotions_data.csv")
 
-from textblob import TextBlob
-
+# ----------------------
+# Functions
+# ----------------------
 def detect_text_emotion(text):
     polarity = TextBlob(text).sentiment.polarity
 
@@ -79,9 +36,6 @@ def detect_text_emotion(text):
     else:
         return "Neutral"
 
-from deepface import DeepFace
-import cv2
-
 def detect_face_emotion(image_path):
     result = DeepFace.analyze(
         img_path=image_path,
@@ -90,8 +44,6 @@ def detect_face_emotion(image_path):
     )
     return result[0]['dominant_emotion']
 
-from google.colab import files
-
 def recommend(emotion):
     row = emotion_df[emotion_df["Emotion"].str.lower() == emotion.lower()]
     if not row.empty:
@@ -99,27 +51,48 @@ def recommend(emotion):
     else:
         return "No song found", "No quote found"
 
-# User interaction for text emotion
-text = input("Enter your feeling text: ")
-emotion_from_text = detect_text_emotion(text)
+# ----------------------
+# App UI
+# ----------------------
+option = st.radio(
+    "Choose input type:",
+    ("Text Emotion Detection", "Face Emotion Detection")
+)
 
-song_text, quote_text = recommend(emotion_from_text)
+# ----------------------
+# TEXT EMOTION
+# ----------------------
+if option == "Text Emotion Detection":
+    text = st.text_area("Enter how you feel:")
 
-print("Detected Emotion (Text):", emotion_from_text)
-print("Recommended Song (Text):", song_text)
-print("Quote (Text):", quote_text)
+    if st.button("Detect Emotion"):
+        emotion = detect_text_emotion(text)
+        song, quote = recommend(emotion)
 
-# User interaction for face emotion
-print("Please upload an image for face emotion detection.")
-uploaded = files.upload()
+        st.success(f"Detected Emotion: {emotion}")
+        st.write("🎵 **Recommended Song:**", song)
+        st.write("💬 **Quote:**", quote)
 
-if uploaded:
-    image_path = list(uploaded.keys())[0]
-    emotion_from_face = detect_face_emotion(image_path)
-    song_face, quote_face = recommend(emotion_from_face)
+# ----------------------
+# FACE EMOTION
+# ----------------------
+if option == "Face Emotion Detection":
+    uploaded_file = st.file_uploader(
+        "Upload your face image",
+        type=["jpg", "png", "jpeg"]
+    )
 
-    print("Detected Emotion (Face):", emotion_from_face)
-    print("Recommended Song (Face):", song_face)
-    print("Quote (Face):", quote_face)
-else:
-    print("No image uploaded for face emotion detection.")
+    if uploaded_file is not None:
+        st.image(uploaded_file, caption="Uploaded Image")
+
+        with tempfile.NamedTemporaryFile(delete=False) as temp:
+            temp.write(uploaded_file.read())
+            temp_path = temp.name
+
+        if st.button("Detect Emotion"):
+            emotion = detect_face_emotion(temp_path)
+            song, quote = recommend(emotion)
+
+            st.success(f"Detected Emotion: {emotion}")
+            st.write("🎵 **Recommended Song:**", song)
+            st.write("💬 **Quote:**", quote)
